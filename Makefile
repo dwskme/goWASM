@@ -1,3 +1,2 @@
 build:
-	GOOS=js GOARCH=wasm go build -o main.wasm
-
+	tinygo build -o static/main.wasm -target wasm ./cmd/main.go

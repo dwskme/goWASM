@@ -5,30 +5,88 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Go + WebAssembly Image Converter</title>
-  <script src="wasm_exec.js"></script>
-  <script>
-    const go = new Go();
-    WebAssembly.instantiateStreaming(
-      fetch("main.wasm"),
-      go.importObject,
-    ).then((result) => {
-      go.run(result.instance);
-    });
-  </script>
-  <script src="main.wasm"></script>
+  <style>
+    .image {
+      display: block;
+      max-height: 25rem;
+      width: 49%;
+      float: left;
+      border: 2px solid gray;
+      margin-right: 2px;
+    }
+
+    .separator {
+      clear: both;
+    }
+  </style>
 </head>
 
 <body>
-  <input type="file" id="imageInput" accept="image/*" />
-  <button onclick="uploadImage()">Upload Image</button>
+  <div id="status"></div>
+  <input type="file" id="uploader" />
+  <button id="close">Shutdown app</button>
   <br />
-  <img id="imageView" alt="Uploaded Image" style="display: none" />
-  <br />
-  <button onclick="convertToGrayscale()">Convert to Grayscale</button>
-  <br />
-  <a id="downloadLink" style="display: none" download="grayscale_image.png">
-    <button onclick="downloadImage()">Download Grayscale Image</button>
-  </a>
+  <label for="brightness">Brightness</label>
+  <input type="range" min="-1" max="1" value="0" step="0.1" id="brightness" />
+  <label for="contrast">Contrast</label>
+  <input type="range" min="-1" max="1" value="0" step="0.1" id="contrast" />
+  <label for="hue">Hue</label>
+  <input type="range" min="-360" max="360" value="0" step="10" id="hue" />
+  <label for="sat">Saturation</label>
+  <input type="range" min="-1" max="1" value="0" step="0.1" id="sat" />
+
+  <div class="separator">Results:</div>
+  <div>
+    <image id="sourceImg" class="image" />
+    <image id="targetImg" class="image" />
+  </div>
+
+  <script src="wasm_exec_tiny.js"></script>
+  <script>
+    const go = new Go();
+    const WASM_URL = "wasm.wasm";
+    var wasm;
+    if ("instantiateStreaming" in WebAssembly) {
+      WebAssembly.instantiateStreaming(fetch(WASM_URL), go.importObject).then(
+        function (obj) {
+          wasm = obj.instance;
+          go.run(wasm);
+        },
+      );
+    } else {
+      fetch(WASM_URL)
+        .then((resp) => resp.arrayBuffer())
+        .then((bytes) =>
+          WebAssembly.instantiate(bytes, go.importObject).then(
+            function (obj) {
+              wasm = obj.instance;
+              go.run(wasm);
+            },
+          ),
+        );
+    }
+  </script>
+  <script>
+    let imageType;
+    function displayImage(buf) {
+      let blob = new Blob([buf], {type: imageType});
+      document.getElementById("targetImg").src = URL.createObjectURL(blob);
+    }
+    document
+      .getElementById("uploader")
+      .addEventListener("change", function () {
+        let reader = new FileReader();
+        reader.onload = (ev) => {
+          bytes = new Uint8Array(ev.target.result);
+          loadImage(bytes);
+          let blob = new Blob([bytes], {type: imageType});
+          document.getElementById("sourceImg").src =
+            URL.createObjectURL(blob);
+        };
+        imageType = this.files[0].type;
+        reader.readAsArrayBuffer(this.files[0]);
+      });
+  </script>
 </body>
 
 </html>
